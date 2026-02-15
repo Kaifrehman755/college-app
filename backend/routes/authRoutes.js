@@ -20,7 +20,7 @@ router.get('/repair-admin', async (req, res) => {
         const newAdmin = new User({
             name: "Render Admin",
             email: "admin@final.com",
-            password: hashedPassword,
+            password: admin123,
             role: "admin",
             isAdmin: true
         });
