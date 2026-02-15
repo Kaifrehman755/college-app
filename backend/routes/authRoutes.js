@@ -1,45 +1,60 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs'); // BcryptJS hi use karna
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const User = require('../models/User'); // Path check kar lena
 
-// --- LOGIN ROUTE ---
+// ROUTE: POST /api/auth/login
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  try {
-    // 1. Check if User Exists
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ msg: 'User not found' });
+    console.log("👉 Login Request Aayi:", email); // Render Logs mein dikhega
 
-    // 2. Validate Password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
+    try {
+        // 1. User Dhoondo
+        const user = await User.findOne({ email });
+        
+        if (!user) {
+            console.log("❌ User Database mein nahi mila!");
+            return res.status(400).json({ msg: "User not found" });
+        }
 
-    // 3. Generate Token (Payload includes Email & Name)
-    // Ye step sabse important hai student dashboard ke liye
-    const token = jwt.sign(
-      { 
-        id: user._id, 
-        role: user.role, 
-        email: user.email, // <--- Added Email
-        name: user.name    // <--- Added Name
-      }, 
-      'secret_key', // Production me ise .env file me rakhein
-      { expiresIn: '1d' }
-    );
+        console.log("✅ User Mil Gaya:", user.email);
+        console.log("🔑 Password Check Kar Raha Hoon...");
 
-    // 4. Send Response
-    res.json({ 
-      token, 
-      role: user.role,
-      user: { name: user.name, email: user.email } 
-    });
+        // 2. Password Match Karo (Bcrypt compare)
+        // Dhyan de: 'password' user ka input hai, 'user.password' DB ka hash hai
+        const isMatch = await bcrypt.compare(password, user.password);
 
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+        if (!isMatch) {
+            console.log("❌ Password Match FAIL hua!");
+            return res.status(400).json({ msg: "Invalid Credentials (Password Wrong)" });
+        }
+
+        console.log("🎉 SUCCESS! Login Ho Gaya");
+
+        // 3. Token Generate
+        const payload = {
+            user: {
+                id: user.id,
+                role: user.role // Admin/Student role bhi bhejo
+            }
+        };
+
+        jwt.sign(
+            payload,
+            process.env.JWT_SECRET || "mysecrettoken", // Fallback secret
+            { expiresIn: '1h' },
+            (err, token) => {
+                if (err) throw err;
+                res.json({ token, role: user.role }); // Token aur Role wapas bhejo
+            }
+        );
+
+    } catch (err) {
+        console.error("🔥 Server Error:", err.message);
+        res.status(500).send("Server Error");
+    }
 });
 
 module.exports = router;
